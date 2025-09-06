@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Tracker & Nutrition Summary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .input-container {
+            margin-bottom: 20px;
+        }
+
+        .summary {
+            margin-top: 30px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary h2 {
+            margin-top: 0;
+        }
+
+        .button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Food Tracker & Nutrition Summary</h1>
+
+    <div class="input-container">
+        <label for="foodInput">Enter your food for today:</label>
+        <input type="text" id="foodInput" placeholder="e.g. Apple, Banana, Rice" />
+        <button id="addFoodButton" class="button">Add Food</button>
+    </div>
+
+    <div class="summary" id="dailySummary">
+        <h2>Daily Summary</h2>
+        <p id="dailySummaryText">No food data added yet.</p>
+    </div>
+
+    <div class="summary" id="threeDaySummary">
+        <h2>3-Day Summary</h2>
+        <p id="threeDaySummaryText">No data for 3-day summary.</p>
+    </div>
+
+    <script>
+        // Nutritional target values (for simplicity, set sample targets)
+        const dailyTargets = {
+            calories: 2000, 
+            protein: 50, 
+            carbs: 300, 
+            fat: 70,     
+            vitamins: { 
+                A: 900,  
+                D: 20    
+            }
+        };
+
+        // Store food data for each day (using localStorage)
+        let dailyFoodData = JSON.parse(localStorage.getItem('foodData')) || [];
+        let dailyFoodLog = JSON.parse(localStorage.getItem('dailyFoodLog')) || [];
+
+        // Set your Hugging Face API token here
+        const apiToken = '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';  // Replace with your own token
+
+        // Function to analyze the food using Hugging Face API
+        async function getFoodNutritionalData(food) {
+            const query = `Analyze the nutritional benefits and deficiencies of this food: ${food}`;
+            const response = await fetch('https://api-inference.huggingface.co/models/gpt-3', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ inputs: query })
+            });
+
+            const result = await response.json();
+            if (result && result[0]) {
+                return result[0].generated_text;  // Return the analysis text
+            } else {
+                return "Nutritional data not found.";
+            }
+        }
+
+        // Add food data to the log
+        document.getElementById('addFoodButton').addEventListener('click', async function () {
+            const foodInput = document.getElementById('foodInput').value;
+            if (foodInput) {
+                const foodArray = foodInput.split(',').map(item => item.trim());
+                foodArray.forEach(food => {
+                    // Store the food for today
+                    dailyFoodData.push(food);
+                });
+                localStorage.setItem('foodData', JSON.stringify(dailyFoodData));
+                document.getElementById('foodInput').value = '';  // Clear input box
+
+                // Fetch the nutritional data from Hugging Face for each food item
+                const foodAnalysisResults = [];
+                for (let food of foodArray) {
+                    const analysis = await getFoodNutritionalData(food);
+                    foodAnalysisResults.push(analysis);
+                }
+
+                // Update daily and 3-day summaries
+                updateDailySummary(foodAnalysisResults);
+                updateThreeDaySummary();
+            }
+        });
+
+        // Helper function to calculate daily intake summary
+        function summarizeDailyIntake() {
+            let totalCalories = 0;
+            let totalProtein = 0;
+            let totalCarbs = 0;
+            let totalFat = 0;
+            let totalVitamins = { A: 0, D: 0 };
+
+            // Sum up the nutritional data for all foods added today
+            dailyFoodData.forEach(food => {
+                const nutrition = getFoodNutritionalData(food);
+                totalCalories += nutrition.calories;
+                totalProtein += nutrition.protein;
+                totalCarbs += nutrition.carbs;
+                totalFat += nutrition.fat;
+                totalVitamins.A += nutrition.vitamins.A;
+                totalVitamins.D += nutrition.vitamins.D;
+            });
+
+            // Check for deficiencies
+            const deficiencies = [];
+            if (totalCalories < dailyTargets.calories) deficiencies.push('Calories');
+            if (totalProtein < dailyTargets.protein) deficiencies.push('Protein');
+            if (totalCarbs < dailyTargets.carbs) deficiencies.push('Carbs');
+            if (totalFat < dailyTargets.fat) deficiencies.push('Fat');
+            if (totalVitamins.A < dailyTargets.vitamins.A) deficiencies.push('Vitamin A');
+            if (totalVitamins.D < dailyTargets.vitamins.D) deficiencies.push('Vitamin D');
+
+            return {
+                totalCalories,
+                totalProtein,
+                totalCarbs,
+                totalFat,
+                totalVitamins,
+                deficiencies
+            };
+        }
+
+        // Update daily summary section
+        function updateDailySummary(foodAnalysisResults) {
+            const dailySummary = summarizeDailyIntake();
+            const summaryText = `Total Calories: ${dailySummary.totalCalories}/${dailyTargets.calories} kcal\n` +
+                `Protein: ${dailySummary.totalProtein}/${dailyTargets.protein} g\n` +
+                `Carbs: ${dailySummary.totalCarbs}/${dailyTargets.carbs} g\n` +
+                `Fat: ${dailySummary.totalFat}/${dailyTargets.fat} g\n` +
+                `Vitamin A: ${dailySummary.totalVitamins.A}/${dailyTargets.vitamins.A} mcg\n` +
+                `Vitamin D: ${dailySummary.totalVitamins.D}/${dailyTargets.vitamins.D} mcg\n` +
+                `Deficiencies: ${dailySummary.deficiencies.length ? dailySummary.deficiencies.join(', ') : 'None'}`;
+
+            const analysisText = foodAnalysisResults.join('\n');
+
+            document.getElementById('dailySummaryText').textContent = `${summaryText}\n\nFood Analysis:\n${analysisText}`;
+        }
+
+        // Helper function to summarize every 3 days
+        function updateThreeDaySummary() {
+            if (dailyFoodLog.length >= 3) {
+                let lastThreeDays = dailyFoodLog.slice(-3);
+                let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalVitamins = { A: 0, D: 0 };
+                let deficiencies = [];
+
+                lastThreeDays.forEach(day => {
+                    totalCalories += day.totalCalories;
+                    totalProtein += day.totalProtein;
+                    totalCarbs += day.totalCarbs;
+                    totalFat += day.totalFat;
+                    totalVitamins.A += day.totalVitamins.A;
+                    totalVitamins.D += day.totalVitamins.D;
+                });
+
+                if (totalCalories < dailyTargets.calories * 3) deficiencies.push('Calories');
+                if (totalProtein < dailyTargets.protein * 3) deficiencies.push('Protein');
+                if (totalCarbs < dailyTargets.carbs * 3) deficiencies.push('Carbs');
+                if (totalFat < dailyTargets.fat * 3) deficiencies.push('Fat');
+                if (totalVitamins.A < dailyTargets.vitamins.A * 3) deficiencies.push('Vitamin A');
+                if (totalVitamins.D < dailyTargets.vitamins.D * 3) deficiencies.push('Vitamin D');
+
+                const threeDaySummaryText = `3-Day Nutritional Summary:\n` +
+                    `Total Calories: ${totalCalories}/${dailyTargets.calories * 3} kcal\n` +
+                    `Protein: ${totalProtein}/${dailyTargets.protein * 3} g\n` +
+                    `Carbs: ${totalCarbs}/${dailyTargets.carbs * 3} g\n` +
+                    `Fat: ${totalFat}/${dailyTargets.fat * 3} g\n` +
+                    `Vitamin A: ${totalVitamins.A}/${dailyTargets.vitamins.A * 3} mcg\n` +
+                    `Vitamin D: ${totalVitamins.D}/${dailyTargets.vitamins.D * 3} mcg\n` +
+                    `Deficiencies: ${deficiencies.length ? deficiencies.join(', ') : 'None'}`;
+
+                document.getElementById('threeDaySummaryText').textContent = threeDaySummaryText;
+            }
+        }
+
+        // Periodically update the daily summary
+        setInterval(() => {
+            updateDailySummary();
+            updateThreeDaySummary();
+        }, 24 * 60 * 60 * 1000); // Update every 24 hours
+    </script>
+
+</body>
+</html>
