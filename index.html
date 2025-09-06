@@ -105,6 +105,12 @@
     .note-list::-webkit-scrollbar-track {
       background: #f1f1f1;
     }
+
+    .warning {
+      color: #e74c3c;
+      font-weight: bold;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -163,9 +169,9 @@
 
     function saveData() {
       let date = document.getElementById("date").value;
-      let sleepHours = document.getElementById("sleep-hours").value;
-      let foodCalories = document.getElementById("food-calories").value;
-      let mealCount = document.getElementById("meal-count").value;
+      let sleepHours = parseInt(document.getElementById("sleep-hours").value);
+      let foodCalories = parseInt(document.getElementById("food-calories").value);
+      let mealCount = parseInt(document.getElementById("meal-count").value);
       let foodBenefits = document.getElementById("food-benefits").value;
       let missingBenefits = document.getElementById("missing-benefits").value;
 
@@ -174,28 +180,39 @@
         return;
       }
 
-      // Calculate emotion based on meals and sleep
-      let emotion = (mealCount >= 3 && sleepHours >= 8) ? "Positive" : "Not Positive";
-
-      let data = {
-        sleep: {
-          hours: sleepHours,
-          quality: sleepHours >= 8 ? "Good" : "Poor"
-        },
-        food: {
-          calories: foodCalories,
-          mealCount: mealCount,
-          benefits: foodBenefits,
-          missing: missingBenefits
-        },
-        emotion: emotion
-      };
-
       // Get current data from localStorage, or initialize if none exists
       let trackerData = JSON.parse(localStorage.getItem("trackerData")) || {};
 
-      // Add/update the data for the selected date
-      trackerData[date] = data;
+      // Initialize the day's data if it doesn't exist
+      if (!trackerData[date]) {
+        trackerData[date] = {
+          sleep: { hours: 0 },
+          food: { calories: 0, mealCount: 0, benefits: "", missing: "" },
+          emotion: "Not Positive",
+          warning: ""
+        };
+      }
+
+      // Update the data for the selected day
+      trackerData[date].sleep.hours += sleepHours; // Accumulate sleep
+      trackerData[date].food.calories += foodCalories; // Accumulate calories
+      trackerData[date].food.mealCount += mealCount; // Accumulate meals
+      trackerData[date].food.benefits = foodBenefits; // Save food benefits
+      trackerData[date].food.missing = missingBenefits; // Save missing benefits
+
+      // Calculate emotion based on total meals and total sleep
+      let emotion = (trackerData[date].food.mealCount >= 3 && trackerData[date].sleep.hours >= 8) ? "Positive" : "Not Positive";
+      trackerData[date].emotion = emotion;
+
+      // Check for warnings
+      let warning = "";
+      if (trackerData[date].food.mealCount <= 1) {
+        warning = "Warning: You ate 1 or fewer meals today!";
+      } else if (trackerData[date].sleep.hours <= 4) {
+        warning = "Warning: You slept 4 hours or less today!";
+      }
+
+      trackerData[date].warning = warning;
 
       // Save the updated data to localStorage
       localStorage.setItem("trackerData", JSON.stringify(trackerData));
@@ -226,12 +243,13 @@
           <div>
             <div class="note-title">${date}</div>
             <div class="note-body">
-              <strong>Sleep:</strong> ${trackerData[date].sleep.hours} hours (${trackerData[date].sleep.quality})<br>
+              <strong>Sleep:</strong> ${trackerData[date].sleep.hours} hours<br>
               <strong>Meals:</strong> ${trackerData[date].food.mealCount} meals<br>
-              <strong>Calories:</strong> ${trackerData[date].food.calories} kcal<br>
+              <strong>Food Calories:</strong> ${trackerData[date].food.calories} calories<br>
               <strong>Emotion:</strong> ${trackerData[date].emotion}<br>
               <strong>Food Benefits:</strong> ${trackerData[date].food.benefits}<br>
-              <strong>Missing Nutrients:</strong> ${trackerData[date].food.missing}
+              <strong>Missing Nutrients:</strong> ${trackerData[date].food.missing}<br>
+              <strong>Warning:</strong> ${trackerData[date].warning}
             </div>
           </div>
           <button class="btn btn-danger" onclick="deleteEntry('${date}')">Delete</button>
