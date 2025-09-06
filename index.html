@@ -207,9 +207,9 @@
       // Check for warnings
       let warning = "";
       if (trackerData[date].food.mealCount <= 1) {
-        warning = "Warning: You ate 1 or fewer meals today!";
+        warning = "⚠: You ate 1 or fewer meals today!";
       } else if (trackerData[date].sleep.hours <= 4) {
-        warning = "Warning: You slept 4 hours or less today!";
+        warning = "⚠: You slept 4 hours or less today!";
       }
 
       trackerData[date].warning = warning;
