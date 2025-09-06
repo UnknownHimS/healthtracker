@@ -33,6 +33,9 @@
       margin: 15px 0;
       padding: 20px;
       border-left: 5px solid #3498db;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .note-title {
@@ -171,17 +174,21 @@
         return;
       }
 
+      // Calculate emotion based on meals and sleep
+      let emotion = (mealCount >= 3 && sleepHours >= 8) ? "Positive" : "Not Positive";
+
       let data = {
         sleep: {
           hours: sleepHours,
-          quality: sleepHours >= 7 ? "Good" : "Poor"
+          quality: sleepHours >= 8 ? "Good" : "Poor"
         },
         food: {
           calories: foodCalories,
           mealCount: mealCount,
           benefits: foodBenefits,
           missing: missingBenefits
-        }
+        },
+        emotion: emotion
       };
 
       // Get current data from localStorage, or initialize if none exists
@@ -199,6 +206,14 @@
       updateNotes(trackerData);
     }
 
+    // Function to delete an entry
+    function deleteEntry(date) {
+      let trackerData = JSON.parse(localStorage.getItem("trackerData"));
+      delete trackerData[date];
+      localStorage.setItem("trackerData", JSON.stringify(trackerData));
+      updateNotes(trackerData);
+    }
+
     function updateNotes(trackerData) {
       let noteList = document.getElementById('note-list');
       noteList.innerHTML = ""; // Clear current list
@@ -208,14 +223,18 @@
         noteDiv.classList.add('note-card');
 
         noteDiv.innerHTML = `
-          <div class="note-title">${date}</div>
-          <div class="note-body">
-            <strong>Sleep:</strong> ${trackerData[date].sleep.hours} hours (${trackerData[date].sleep.quality})<br>
-            <strong>Meals:</strong> ${trackerData[date].food.mealCount} meals<br>
-            <strong>Calories:</strong> ${trackerData[date].food.calories} kcal<br>
-            <strong>Food Benefits:</strong> ${trackerData[date].food.benefits}<br>
-            <strong>Missing Nutrients:</strong> ${trackerData[date].food.missing}
+          <div>
+            <div class="note-title">${date}</div>
+            <div class="note-body">
+              <strong>Sleep:</strong> ${trackerData[date].sleep.hours} hours (${trackerData[date].sleep.quality})<br>
+              <strong>Meals:</strong> ${trackerData[date].food.mealCount} meals<br>
+              <strong>Calories:</strong> ${trackerData[date].food.calories} kcal<br>
+              <strong>Emotion:</strong> ${trackerData[date].emotion}<br>
+              <strong>Food Benefits:</strong> ${trackerData[date].food.benefits}<br>
+              <strong>Missing Nutrients:</strong> ${trackerData[date].food.missing}
+            </div>
           </div>
+          <button class="btn btn-danger" onclick="deleteEntry('${date}')">Delete</button>
         `;
         
         noteList.appendChild(noteDiv);
@@ -223,11 +242,10 @@
     }
 
     // Initialize the notes on page load
-    window.onload = function() {
+    window.onload = () => {
       let trackerData = JSON.parse(localStorage.getItem("trackerData")) || {};
       updateNotes(trackerData);
-    }
+    };
   </script>
-
 </body>
 </html>
